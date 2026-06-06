@@ -1,1 +1,1 @@
-# Copyboard UI package
+"""Copyboard UI 组件包"""

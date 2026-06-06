@@ -4,16 +4,17 @@ Copyboard — Windows 历史剪贴板管理器
 """
 
 # ── 单实例互斥锁 ──
+import sys
 import ctypes
-kernel32 = ctypes.windll.kernel32
-MUTEX_NAME = 'Copyboard_SingleInstance_Mutex'
-mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
-if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-    # 已有实例在运行，激活其窗口后退出
-    hwnd = ctypes.windll.user32.FindWindowW(None, 'Copyboard')
-    if hwnd:
-        ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        ctypes.windll.user32.SetForegroundWindow(hwnd)
+_kernel32 = ctypes.windll.kernel32
+_user32 = ctypes.windll.user32
+_MUTEX_NAME = 'Copyboard_SingleInstance_Mutex'
+_mutex = _kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+if _kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+    _hwnd = _user32.FindWindowW(None, 'Copyboard')
+    if _hwnd:
+        _user32.ShowWindow(_hwnd, 9)  # SW_RESTORE
+        _user32.SetForegroundWindow(_hwnd)
     sys.exit(0)
 
 # ── DPI 感知（必须在 tkinter 之前调用）──
@@ -25,7 +26,6 @@ except Exception:
     except Exception:
         pass
 
-import sys
 import os
 import json
 import threading
@@ -41,7 +41,7 @@ import settings_manager as settings
 from clipboard_monitor import monitor
 from file_store import delete_stored_files, get_full_path, read_thumb_base64, delete_thumb
 from ui.theme_manager import theme, THEMES
-from tray_manager import run_tray
+from tray_manager import create_tray_icon as run_tray
 from hotkey_manager import register_hotkey, unregister as unregister_hotkey
 
 
