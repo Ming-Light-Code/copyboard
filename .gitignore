@@ -3,7 +3,6 @@ __pycache__/
 *.pyo
 *.egg-info/
 build/
-dist/
 data/
 *.db
 .vscode/
