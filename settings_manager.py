@@ -13,6 +13,7 @@ DEFAULTS = {
     'auto_start': 'false',
     'poll_interval_ms': '750',
     'hotkey': 'alt+v',
+    'hide_delay_ms': '800',   # 鼠标离开后隐藏延时
     'storage_mode': 'light',  # light: 仅路径引用 / full: 复制到本地
 }
 

@@ -194,12 +194,13 @@ class SettingsDialog:
         scrollbar.pack(side='right', fill='y', pady=(4, 8))
 
         def _on_mwheel(e):
-            canvas.yview_scroll(-1 * (e.delta // 60), 'units')
-        # 绑定到所有相关 widget，确保滚轮在任何位置都能生效
-        for w in (self.dialog, canvas, scrollbar, content):
-            w.bind('<MouseWheel>', _on_mwheel)
-        # 全局绑定（对话框打开期间）
-        self._mwheel_binding = _on_mwheel
+            # 仅当鼠标在设置窗口内时才滚动
+            dx, dy = self.dialog.winfo_pointerxy()
+            wx, wy = self.dialog.winfo_x(), self.dialog.winfo_y()
+            ww, wh = self.dialog.winfo_width(), self.dialog.winfo_height()
+            if wx <= dx <= wx + ww and wy <= dy <= wy + wh:
+                canvas.yview_scroll(-1 * (e.delta // 60), 'units')
+
         self.dialog.bind_all('<MouseWheel>', _on_mwheel, add='+')
         self.dialog.protocol('WM_DELETE_WINDOW', lambda: self._close_dialog())
 
@@ -212,6 +213,8 @@ class SettingsDialog:
 
         self._add_section_card(content, '🖥 显示设置')
         self._add_toggle_card(content, 'auto_start', '开机自启', '随 Windows 自动启动')
+        self._add_radio_card(content, 'hide_delay_ms', '鼠标离开后隐藏',
+                             [('关闭', '0'), ('0.5 秒', '500'), ('1 秒', '1000'), ('2 秒', '2000')])
 
         self._add_section_card(content, '💾 存储模式')
         self._add_storage_mode_card(content)
@@ -277,12 +280,12 @@ class SettingsDialog:
         tk.Frame(content, bg=colors['bg_secondary'], height=12).pack()
 
     def _close_dialog(self):
-        """关闭设置对话框并解绑全局滚轮"""
-        if hasattr(self, '_mwheel_binding'):
-            try:
+        """关闭设置对话框并解绑滚轮"""
+        try:
+            if self.dialog:
                 self.dialog.unbind_all('<MouseWheel>')
-            except Exception:
-                pass
+        except Exception:
+            pass
         if self.dialog:
             self.dialog.destroy()
             self.dialog = None
@@ -601,6 +604,11 @@ class CopyboardApp:
         self._load_items()
 
         self.root.bind('<Escape>', lambda e: self.hide())
+        # 鼠标离开窗口后延迟隐藏
+        self.root.bind('<Leave>', self._on_mouse_leave)
+        self.root.bind('<Enter>', self._on_mouse_enter)
+        self._hide_timer = None
+
         self.root.after(500, self._init_tray_and_hotkey)
 
     # ── UI 构建 ───────────────────────────────────────────────
@@ -637,6 +645,7 @@ class CopyboardApp:
         # 拖拽
         self.title_bar.bind('<Button-1>', self._start_drag)
         self.title_bar.bind('<B1-Motion>', self._on_drag)
+        self.title_bar.bind('<ButtonRelease-1>', self._on_drag_end)
 
         # Logo + 标题
         left = tk.Frame(self.title_bar, bg=colors['bg_primary'])
@@ -882,12 +891,139 @@ class CopyboardApp:
     # ── 窗口控制 ──────────────────────────────────────────────
 
     def _start_drag(self, event):
-        self._drag_x = event.x
-        self._drag_y = event.y
+        self._drag_x, self._drag_y = event.x, event.y
+        self._dock_edge = None  # 当前吸附的边缘
 
     def _on_drag(self, event):
         self.root.geometry(f'+{self.root.winfo_x() + event.x - self._drag_x}'
                            f'+{self.root.winfo_y() + event.y - self._drag_y}')
+
+    def _on_drag_end(self, event):
+        """拖拽结束后检测是否靠近屏幕边缘，是则自动隐藏"""
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        threshold = 30
+
+        edge = None
+        if x <= threshold:    edge = 'left'
+        elif x + w >= sw - threshold: edge = 'right'
+        elif y <= threshold:  edge = 'top'
+
+        if edge:
+            self._dock_edge = edge
+            self._slide_out(edge, x, y, w, h, sw, sh)
+        else:
+            self._dock_edge = None
+            self._destroy_edge_tab()
+
+    def _slide_out(self, edge, x, y, w, h, sw, sh):
+        """窗口滑出屏幕，仅留 6px 标签"""
+        tab_size = 6
+        targets = {
+            'left':   (-w + tab_size, y),
+            'right':  (sw - tab_size, y),
+            'top':    (x, -h + tab_size),
+        }
+        tx, ty = targets[edge]
+
+        # 简单动画：10 帧滑出
+        for step in range(10):
+            px = int(x + (tx - x) * (step + 1) / 10)
+            py = int(y + (ty - y) * (step + 1) / 10)
+            self.root.after(step * 15, lambda px=px, py=py: self.root.geometry(f'+{px}+{py}'))
+
+        # 显示边缘标签
+        self.root.after(200, lambda: self._show_edge_tab(edge, tx, ty, w, h))
+
+    def _show_edge_tab(self, edge, x, y, w, h):
+        """在屏幕边缘显示彩色标签条"""
+        colors = theme.colors
+        if hasattr(self, '_edge_tab') and self._edge_tab:
+            self._edge_tab.destroy()
+
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self._edge_tab = tk.Toplevel(self.master)
+        self._edge_tab.overrideredirect(True)
+        self._edge_tab.attributes('-topmost', True)
+        self._edge_tab.configure(bg=colors['accent'])
+
+        tab = 6
+        if edge == 'left':
+            self._edge_tab.geometry(f'{tab}x{h}+0+{y}')
+        elif edge == 'right':
+            self._edge_tab.geometry(f'{tab}x{h}+{sw - tab}+{y}')
+        elif edge == 'top':
+            self._edge_tab.geometry(f'{w}x{tab}+{x}+0')
+
+        self._edge_tab.bind('<Enter>', lambda e: self._slide_in(edge))
+        self._edge_tab.lift()
+
+    def _slide_in(self, edge):
+        """鼠标悬停标签 → 窗口滑入"""
+        if hasattr(self, '_edge_tab') and self._edge_tab:
+            self._edge_tab.destroy()
+            self._edge_tab = None
+
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.root.deiconify()
+
+        targets = {'left': (4, y), 'right': (sw - w - 4, y), 'top': (x, 4)}
+        tx, ty = targets[edge]
+
+        for step in range(8):
+            px = int(x + (tx - x) * (step + 1) / 8)
+            py = int(y + (ty - y) * (step + 1) / 8)
+            self.root.after(step * 15, lambda px=px, py=py: self.root.geometry(f'+{px}+{py}'))
+
+        self.root.after(150, lambda: self.root.lift())
+        self.root.after(150, lambda: self.root.focus_force())
+        self._dock_edge = None
+
+    def _destroy_edge_tab(self):
+        if hasattr(self, '_edge_tab') and self._edge_tab:
+            self._edge_tab.destroy()
+            self._edge_tab = None
+
+    def _on_mouse_leave(self, event):
+        """鼠标离开窗口 → 延迟后滑出到边缘"""
+        delay = int(settings.get('hide_delay_ms') or '0')
+        if delay <= 0:
+            return
+        if self._hide_timer:
+            self.root.after_cancel(self._hide_timer)
+        self._hide_timer = self.root.after(delay, self._check_mouse_gone)
+
+    def _on_mouse_enter(self, event):
+        """鼠标进入 → 取消隐藏计时"""
+        if self._hide_timer:
+            self.root.after_cancel(self._hide_timer)
+            self._hide_timer = None
+
+    def _check_mouse_gone(self):
+        """确认鼠标是否仍在窗口内，不在且窗口靠边时才滑出"""
+        x, y = self.root.winfo_pointerxy()
+        wx, wy = self.root.winfo_x(), self.root.winfo_y()
+        ww, wh = self.root.winfo_width(), self.root.winfo_height()
+        if (wx <= x <= wx + ww and wy <= y <= wy + wh):
+            return  # 鼠标还在窗口内
+
+        # 仅当窗口已在边缘时才滑出
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        threshold = 30
+        if wx <= threshold:
+            edge = 'left'
+        elif wx + ww >= sw - threshold:
+            edge = 'right'
+        elif wy <= threshold:
+            edge = 'top'
+        else:
+            return  # 不靠边，不隐藏
+
+        self._dock_edge = edge
+        self._slide_out(edge, wx, wy, ww, wh, sw, sh)
 
     def _position_window(self):
         screen_w = self.root.winfo_screenwidth()
@@ -900,10 +1036,24 @@ class CopyboardApp:
         self.root.withdraw()
 
     def show(self):
+        self._destroy_edge_tab()
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
         self._load_items()
+        # 如果窗口处于吸附隐藏状态，滑入到正常位置
+        if hasattr(self, '_dock_edge') and self._dock_edge:
+            edge = self._dock_edge
+            self._dock_edge = None
+            x, y = self.root.winfo_x(), self.root.winfo_y()
+            w = self.root.winfo_width()
+            sw = self.root.winfo_screenwidth()
+            targets = {'left': (4, y), 'right': (sw - w - 4, y), 'top': (x, 4)}
+            if edge in targets:
+                tx, ty = targets[edge]
+                self.root.geometry(f'+{tx}+{ty}')
+                self.root.lift()
+                self.root.focus_force()
 
     def toggle(self):
         if self.root.state() == 'withdrawn':
