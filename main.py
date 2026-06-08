@@ -41,6 +41,7 @@ import settings_manager as settings
 from clipboard_monitor import monitor
 from file_store import delete_stored_files, get_full_path, read_thumb_base64, delete_thumb
 from ui.theme_manager import theme, THEMES
+from version import __version__
 from tray_manager import create_tray_icon as run_tray
 from hotkey_manager import register_hotkey, unregister as unregister_hotkey
 
@@ -667,6 +668,10 @@ class CopyboardApp:
         right = tk.Frame(self.title_bar, bg=colors['bg_primary'])
         right.pack(side='right', padx=8)
         self._title_btn(right, '✕', '关闭', lambda e: self.quit_app(), hover_color=colors['danger'])
+        tk.Label(left, text=f'v{__version__}',
+                 font=('Microsoft YaHei UI', 8),
+                 bg=colors['bg_primary'], fg=colors['text_muted']).pack(side='left', padx=4)
+
         self._title_btn(right, '─', '最小化', lambda e: self.hide())
         self._title_btn(right, '⚙', '设置', lambda e: self._show_settings())
         self._title_btn(right, '🎨', '切换主题', lambda e: self._cycle_theme())
