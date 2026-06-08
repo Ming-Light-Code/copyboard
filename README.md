@@ -8,7 +8,6 @@
 - **快捷呼出** — 按 `Alt+V` 弹出面板，浏览历史记录
 - **一键粘贴** — 点击卡片复制到剪贴板，支持连续复制不关闭面板
 - **智能分类** — 文字、图片、文件、文件夹自动识别分类，图片文件按扩展名归类
-- **搜索筛选** — 精准匹配 + 模糊搜索，按类型筛选
 - **收藏 & 置顶** — 常用条目收藏，重要内容置顶
 - **5 套主题** — 浅色 / 深色 / 暖色 / 森林 / 海洋，一键切换
 - **存储模式** — 轻量模式（仅路径引用）和完整模式（复制到本地）自由切换
@@ -22,28 +21,6 @@
 
 ![](https://cdn.jsdelivr.net/gh/Ming-Light-Code/Comic-Photos/test/copyboardshow.png)
 
-## 🚀 快速开始
-
-### 方式一：直接运行发行版
-
-下载 `dist/Copyboard.exe`，双击运行即可，无需安装 Python。
-
-### 方式二：源码运行
-
-```bash
-# 1. 安装依赖
-pip install -r requirements.txt
-
-# 2. 运行
-python main.py
-```
-
-### 方式三：自行打包
-
-```bash
-pip install pyinstaller
-pyinstaller copyboard.spec --distpath .\dist --workpath .\build --clean
-```
 
 ## 📁 项目结构
 
@@ -74,7 +51,7 @@ copyboard/
 | 剪贴板 | Windows API (CF_HDROP / CF_DIB) + PIL |
 | 托盘 | pystray |
 | 快捷键 | `RegisterHotKey` API（不安装钩子） |
-| 打包 | PyInstaller (~18MB) |
+| 打包 | PyInstaller |
 
 ## 📋 环境要求
 
