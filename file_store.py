@@ -37,7 +37,8 @@ def classify_paths(paths: list) -> dict:
 
 
 def _data_dir():
-    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+    """数据目录统一在 APPDATA/Copyboard"""
+    d = os.path.join(os.getenv('APPDATA'), 'Copyboard')
     os.makedirs(d, exist_ok=True)
     return d
 

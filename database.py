@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 
 
 def _db_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'copyboard.db')
+    """数据库统一存放在 APPDATA/Copyboard"""
+    data_dir = os.path.join(os.getenv('APPDATA'), 'Copyboard')
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, 'copyboard.db')
 
 
 class Database:
